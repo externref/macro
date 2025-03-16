@@ -10,10 +10,10 @@ from macro.response import Response
 if typing.TYPE_CHECKING:
     import asgiref.typing as asgiref_typing
 
-ResponseT: typing.TypeAlias = typing.Type[Response]
 RouteT: typing.TypeAlias = typing.Callable[
-    [Request, ResponseT], typing.Awaitable[Response]
+    [Request], typing.Awaitable[Response]
 ]
+"""Type for route callbacks."""
 
 
 class Macro:
@@ -63,7 +63,7 @@ class Macro:
                 response = Response(status=404, body=b"Not Found")
             else:
                 request = Request(headers=headers, body=body)
-                response = await fn(request, Response, **path_vars)
+                response = await fn(request, **path_vars)
             await response.send(send)
 
     def _find_route(
@@ -76,6 +76,14 @@ class Macro:
         return None, {}
 
     def _cast_path_vars(self, fn: RouteT, path_vars: dict) -> dict:
+        """
+        Cast path variables to the appropriate types.
+
+        :param fn: The route handler function.
+        :param path_vars: The path variables.
+        :return: The casted path variables.
+        :raises ValueError: If a path variable cannot be casted to the appropriate type.
+        """
         sig = signature(fn)
         for name, param in sig.parameters.items():
             if name in path_vars and param.annotation != Parameter.empty:
@@ -128,3 +136,156 @@ class Macro:
             return func
 
         return decorator
+
+    def get(self, path: str) -> typing.Callable[[RouteT], RouteT]:
+        """
+        Decorator to register a route handler for a GET request.
+
+        :param path: The route path, which can include dynamic segments.
+        :return: The decorator function.
+        """
+        return self.route(path, "GET")
+
+    def post(self, path: str) -> typing.Callable[[RouteT], RouteT]:
+        """
+        Decorator to register a route handler for a POST request.
+
+        :param path: The route path, which can include dynamic segments.
+        :return: The decorator function.
+        """
+        return self.route(path, "POST")
+
+    def put(self, path: str) -> typing.Callable[[RouteT], RouteT]:
+        """
+        Decorator to register a route handler for a PUT request.
+
+        :param path: The route path, which can include dynamic segments.
+        :return: The decorator function.
+        """
+        return self.route(path, "PUT")
+
+    def delete(self, path: str) -> typing.Callable[[RouteT], RouteT]:
+        """
+        Decorator to register a route handler for a DELETE request.
+
+        :param path: The route path, which can include dynamic segments.
+        :return: The decorator function.
+        """
+        return self.route(path, "DELETE")
+
+    def head(self, path: str) -> typing.Callable[[RouteT], RouteT]:
+        """
+        Decorator to register a route handler for a HEAD request.
+
+        :param path: The route path, which can include dynamic segments.
+        :return: The decorator function.
+        """
+        return self.route(path, "HEAD")
+
+    def options(self, path: str) -> typing.Callable[[RouteT], RouteT]:
+        """
+        Decorator to register a route handler for an OPTIONS request.
+
+        :param path: The route path, which can include dynamic segments.
+        :return: The decorator function.
+        """
+        return self.route(path, "OPTIONS")
+
+    def patch(self, path: str) -> typing.Callable[[RouteT], RouteT]:
+        """
+        Decorator to register a route handler for a PATCH request.
+
+        :param path: The route path, which can include dynamic segments.
+        :return: The decorator function.
+        """
+        return self.route(path, "PATCH")
+
+    def trace(self, path: str) -> typing.Callable[[RouteT], RouteT]:
+        """
+        Decorator to register a route handler for a TRACE request.
+
+        :param path: The route path, which can include dynamic segments.
+        :return: The decorator function.
+        """
+        return self.route(path, "TRACE")
+
+    def connect(self, path: str) -> typing.Callable[[RouteT], RouteT]:
+        """
+        Decorator to register a route handler for a CONNECT request.
+
+        :param path: The route path, which can include dynamic segments.
+        :return: The decorator function.
+        """
+        return self.route(path, "CONNECT")
+
+    def any(self, path: str) -> typing.Callable[[RouteT], RouteT]:
+        """
+        Decorator to register a route handler for any HTTP method.
+
+        :param path: The route path, which can include dynamic segments.
+        :return: The decorator function.
+        """
+
+        def decorator(func: RouteT) -> RouteT:
+            for method in [
+                "GET",
+                "POST",
+                "PUT",
+                "DELETE",
+                "HEAD",
+                "OPTIONS",
+                "PATCH",
+                "TRACE",
+                "CONNECT",
+            ]:
+                self.route(path, method)(func)
+            return func
+
+        return decorator
+
+    def static(self, path: str, file_path: str) -> RouteT:
+        """
+        Serve a static file from the given path.
+
+        :param path: The route path.
+        :param file_path: The path to the file to serve.
+        :return: The route handler.
+        """
+
+        async def handler(request: Request) -> Response:
+            try:
+                with open(file_path, "rb") as file:
+                    body = file.read()
+            except FileNotFoundError:
+                return Response(status=404, body=b"Not Found")
+            return Response(body=body)
+
+        return self.get(path)(handler)
+
+    def redirect(self, path: str, location: str, status: int = 302) -> RouteT:
+        """
+        Redirect requests to a different location.
+
+        :param path: The route path.
+        :param location: The location to redirect to.
+        :param status: The HTTP status code (default is 302).
+        """
+
+        async def handler(request: Request) -> Response:
+            return Response(status=status, headers={"Location": location})
+
+        return self.get(path)(handler)
+
+    def error(self, status: int, message: str) -> RouteT:
+        """
+        Return an error response.
+
+        :param status: The HTTP status code.
+        :param message: The error message.
+        :return: The route handler.
+        """
+
+        async def handler(request: Request) -> Response:
+            return Response(status=status, body=message.encode())
+
+        return handler  # type: ignore

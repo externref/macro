@@ -7,4 +7,4 @@ from .response import (
     Response,
     StreamingResponse,
 )
-from .server import Macro, ResponseT, RouteT
+from .server import Macro, RouteT
