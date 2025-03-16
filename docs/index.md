@@ -22,21 +22,25 @@ pip install git+https://github.com/externref/macro
 Here's a quick example to get you started with Macro:
 
 ```python
-from macro.server import Macro
-from macro.response import Response
+from macro import Macro, Request, Response 
 
-app = Macro()
+macro = Macro()
 
-@app.route("/", method="GET")
-async def homepage(request, response_cls):
-    return response_cls.text("Welcome to Macro!")
+@macro.get("/")
+async def index(request: Request):
+    return Response.text("Hello, world!")
 
-@app.route("/hello/{name}", method="GET")
-async def greet(request, response_cls, name: str):
-    return response_cls.text(f"Hello, {name}!")
+@macro.get("/html")
+async def html(request: Request):
+    return Response.html("<h1>Hello, world!</h1>")
 
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="127.0.0.1", port=8000)
+@macro.get("/json")
+async def json(request: Request):
+    return Response.json({"message": "Hello, world!"})
+
+@macro.get("/redirect")
+async def redirect(request: Request):
+    return Response.redirect("/")
+
 ```
 
