@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import re
 import typing
-from inspect import Parameter, signature
+from inspect import Parameter, signature, iscoroutine
 
 from macro.request import Request, RequestHeader
 from macro.response import Response
@@ -35,7 +35,8 @@ class Macro:
         if not self._started:
             for handler in self.startup_handlers:
                 result = handler()
-                if typing.iscoroutine(result):
+                
+                if iscoroutine(result):
                     await result
             self._started = True
 
