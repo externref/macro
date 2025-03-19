@@ -15,6 +15,11 @@ RouteT: typing.TypeAlias = typing.Callable[
 ]
 """Type for route callbacks."""
 
+StartupT: typing.TypeAlias = typing.Callable[
+    [], typing.Awaitable[None] | None
+]
+"""Type for startup callbacks."""
+
 
 class Macro:
     """
@@ -23,8 +28,17 @@ class Macro:
 
     def __init__(self):
         self.routes: dict[str, dict[str, RouteT]] = {}
+        self.startup_handlers: list[StartupT] = []
+        self._started: bool = False
 
     async def __call__(self, scope: asgiref_typing.Scope, receive, send) -> None:
+        if not self._started:
+            for handler in self.startup_handlers:
+                result = handler()
+                if typing.iscoroutine(result):
+                    await result
+            self._started = True
+
         if scope["type"] == "http":
             await self.handle_http(scope, receive, send)
         else:
@@ -289,3 +303,23 @@ class Macro:
             return Response(status=status, body=message.encode())
 
         return handler  # type: ignore
+
+    def startup(self) -> typing.Callable[[StartupT], StartupT]:
+        """
+        Decorator to register a function to be called on server startup.
+        
+        This function will be called once when the server receives its first request.
+        Both synchronous and asynchronous functions are supported.
+        
+        :return: The decorator function.
+        
+        Example:
+            @app.startup()
+            async def on_startup():
+                # Initialize resources
+                print("Server started")
+        """
+        def decorator(func: StartupT) -> StartupT:
+            self.startup_handlers.append(func)
+            return func
+        return decorator
